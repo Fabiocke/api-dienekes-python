@@ -1,47 +1,78 @@
 import asyncio
 from aiohttp import ClientSession
 import json
+import aiohttp
 
 # Como a quantidade de páginas é muito grade, criei essa classe que utiliza metodos assincronos, o que deixa o processo muito mais rápido
-class RequestAPI:
-    async def request_api(self, session, url):
-        # faz 10 tentativas para o caso da resposta vir com erro
-        for i in range(10):
-            async with session.get(url) as result:
-                r=await result.json()
-                if 'numbers' in r:
-                    if r['numbers']:
-                        self.results+=r['numbers']
-                    else:
-                        self.finish=1  
-                    break
+class AsyncRequest:
+    # attempts é o número de tentantivas em cada requisição em caso de erros e resultados indesejados
+    def __init__(self, attempts=1):
+        self.attempts=attempts
+    
+    def test_error(self, r):
+        return 'numbers' in r
 
-    async def request_all(self, urls):
+    def test_page(self, r):
+        return len(r['numbers'])
+    
+    async def request(self, session, url):
+        for i in range(self.attempts):
+            try:
+                async with session.get(url) as r:
+                    r=await r.json()
+                    if self.test_error(r):
+                        self.results.append(r)
+                        break
+            except aiohttp.ClientConnectionError:
+                print("Erro na conexão")
+   
+
+    async def request_many(self, urls):
         async with ClientSession() as session:
-            tasks = []
-            for url in urls:
-                task = asyncio.ensure_future(self.request_api(session, url))
-                tasks.append(task)
+            tasks = [asyncio.create_task(self.request(session, url)) for url in urls]
             await asyncio.gather(*tasks)
 
-    def run(self):
+    
+    async def run_urls(self, urls):
         self.results=[]
-        self.finish = 0
-        ini=1
-        while not self.finish:
-            fim=ini+1000
-            urls=['http://challenge.dienekes.com.br/api/numbers?page='+str(page) for page in range(ini, fim)]
+        await self.request_many(urls)
+        
+    # each é a quantidade de páginas requisitadas por vês
+    # init é a página inicial
+    # limit é a quantidade máxma de páginas
+    async def run_pages(self, url, init=1, each=1000, logs=True, limit=None):
+        if not limit: 
+            limit=float('inf')
+        self.results=[]
+        init=1
+        while True:
+            end = init+each
+            urls=[url.format(i) for i in range(init, end) if i <= limit]
+            await self.request_many(urls)
+            if logs:
+                print(f'init: {init} | end: {end} | results: {len(self.results)}', end='\r')
+            if limit and end >= limit:
+                break
+            if not all([self.test_page(r) for r in self.results[each*(-1):]]):
+                break
+            init+=each
 
-            asyncio.set_event_loop(asyncio.SelectorEventLoop())
-            asyncio.get_event_loop().run_until_complete(self.request_all(urls))
 
-            print(f'{ini} | {fim} | {len(self.results)}', end='\r')
-            ini+=1000
-            
 
-    def to_json(self):
-        data={'numbers':self.results}
-        with open(r'data\raw_numbers.json', 'w') as o:
-            json.dump(data, o)
+def extract():
+    api=AsyncRequest(10)
+    asyncio.run(api.run_pages('http://challenge.dienekes.com.br/api/numbers?page={}'))
+    data=[i for j in [i['numbers'] for i in api.results] for i in j]
+    data={'numbers':data}
+    with open(r'data\raw_numbers.json', 'w') as o:
+        json.dump(data, o)
+    return data
+
+if __name__=='__main__':
+    extract()
+
+
+
+
 
 

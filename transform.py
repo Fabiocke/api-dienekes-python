@@ -1,7 +1,7 @@
 
-from extract import RequestAPI
 import json
 import os
+from extract import extract
 
 # Função baseada no algorítimo QuickSort
 def sorter(lista):
@@ -9,13 +9,6 @@ def sorter(lista):
         return lista
     pivo = lista[0]
     return sorter([i for i in lista if i < pivo]) + [i for i in lista if i == pivo] + sorter([i for i in lista if i > pivo])  
-
-
-def extract():
-    api=RequestAPI()
-    api.run()
-    api.to_json()
-    return api.results
 
 
 def to_json_order(data):
@@ -26,8 +19,8 @@ def to_json_order(data):
 def get_order_numbers(update=True):
     if update:
         numbers=extract()
-        data = sorter(numbers)
-        data={'numbers': data}
+        numbers = sorter(numbers['numbers'])
+        data={'numbers': numbers}
         to_json_order(data)
     elif os.path.isfile(r'data\order_numbers.json'):
         data=open(r'data\order_numbers.json', 'r').read()
@@ -36,5 +29,9 @@ def get_order_numbers(update=True):
         data=get_order_numbers(True)
     return data
 
+
+if __name__=="__main__":
+    data=get_order_numbers()
+    print(data)
 
 

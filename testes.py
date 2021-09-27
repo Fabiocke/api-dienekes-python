@@ -1,4 +1,6 @@
-from transform import sorter, extract
+from transform import sorter
+from extract import AsyncRequest
+import asyncio
 import time
 import requests
 
@@ -7,7 +9,7 @@ def teste_funcao_sorter():
 
     assert sorter(lista)==[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-    return 'Função sorter funcionou'
+    return 'A função sorter funcionou.\n'
 
 
 def teste_primeira_pagina_api():
@@ -16,17 +18,18 @@ def teste_primeira_pagina_api():
     assert 'numbers' in r.json()
     assert r.json()['numbers']
 
-    return 'Primeira página da api funcionando normalmente'
+    return 'A primeira página da api funcionando normalmente.\n'
 
 def teste_extraçao_api():
     inicio = time.time()
-    results=extract()
+    api=AsyncRequest(10)
+    asyncio.run(api.run_pages('http://challenge.dienekes.com.br/api/numbers?page={}', each=1000, limit=1000))
     fim = time.time()
 
-    assert len(results)
-    assert inicio-fim<4
+    assert all([len(i['numbers'])==100 for i in api.results if i['numbers']])
+    assert inicio-fim<5
 
-    return 'Função de extração rodou corretamente em menos de 4 minutos'
+    return 'A função de extração de 1000 páginas rodou corretamente em menos de 5 de segundos.\n\nTodas as páginas extraídas vieram com 100 números.'
 
 if __name__=='__main__':
     print(teste_funcao_sorter())
